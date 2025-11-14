@@ -1,6 +1,7 @@
 version: "3.8"
 
 services:
+  # -------- ZooKeeper --------
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: zookeeper
@@ -9,6 +10,7 @@ services:
     ports:
       - "2181:2181"
 
+  # -------- Kafka --------
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: kafka
@@ -23,6 +25,53 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
+  # -------- TiDB (Database) --------
+  tidb:
+    image: pingcap/tidb:latest
+    container_name: tidb
+    command: ["--store=unistore", "--path=unistore"]
+    ports:
+      - "4001:4000"   # host:container
+    environment:
+      - TZ=UTC
+
+  # Init job: load schema.sql into TiDB
+  tidb-init:
+    image: mysql:8.0
+    container_name: tidb-init
+    depends_on:
+      - tidb
+    command: >
+      sh -c "
+      until mysql -h tidb -P 4000 -u root -e 'SELECT 1' >/dev/null 2>&1;
+      do echo 'waiting for tidb'; sleep 3; done;
+      mysql -h tidb -P 4000 -u root < /docker-entrypoint-initdb.d/schema.sql
+      "
+    volumes:
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+
+  # -------- API (login + frontend + CDC events to Kafka) --------
+  api:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: helfy-api
+    depends_on:
+      - tidb
+      - kafka
+    ports:
+      - "8080:3000"
+    environment:
+      PORT: 3000
+      DB_HOST: tidb
+      DB_PORT: 4000
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: helfy
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_DB_CHANGES_TOPIC: db-changes
+
+  # -------- Kafka Consumer (metrics + last-message) --------
   consumer:
     build:
       context: ./Consumer
@@ -39,6 +88,7 @@ services:
       KAFKA_GROUP_ID: helfy-group
     command: ["node", "consumer-app.js"]
 
+  # -------- Kafka Producer (HTTP -> Kafka) --------
   producer:
     build:
       context: ./Producer
@@ -53,3 +103,16 @@ services:
       KAFKA_BROKERS: kafka:9092
       KAFKA_TOPIC: test-topic
     command: ["node", "producer-app.js"]
+
+  # -------- DB Changes Consumer (CDC style) --------
+  db-changes-consumer:
+    build:
+      context: ./DbChangesConsumer
+      dockerfile: Dockerfile
+    container_name: db-changes-consumer
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_DB_CHANGES_TOPIC: db-changes
+    command: ["node", "db-changes-consumer.js"]

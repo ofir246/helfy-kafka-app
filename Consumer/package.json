@@ -2,6 +2,9 @@
   "name": "helfy-consumer",
   "version": "1.0.0",
   "main": "consumer-app.js",
+  "scripts": {
+    "start": "node consumer-app.js"
+  },
   "dependencies": {
     "express": "^4.18.2",
     "kafkajs": "^2.2.4"

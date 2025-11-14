@@ -1,0 +1,11 @@
+{
+  "name": "db-changes-consumer",
+  "version": "1.0.0",
+  "main": "db-changes-consumer.js",
+  "scripts": {
+    "start": "node db-changes-consumer.js"
+  },
+  "dependencies": {
+    "kafkajs": "^2.2.4"
+  }
+}

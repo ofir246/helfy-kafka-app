@@ -7,6 +7,4 @@ RUN npm install --production
 
 COPY . .
 
-ENV NODE_ENV=production
-
-CMD ["node", "server.js"]
+CMD ["node", "db-changes-consumer.js"]

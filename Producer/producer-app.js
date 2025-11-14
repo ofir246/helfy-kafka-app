@@ -1,13 +1,11 @@
-// producer-app.js
 const express = require("express");
 const { Kafka } = require("kafkajs");
 
 const app = express();
-const PORT = process.env.PORT || 4000; // שונה מה־consumer
+const PORT = process.env.PORT || 4000;
 
-app.use(express.json()); // to parse JSON bodies
+app.use(express.json());
 
-// ---------- Kafka Producer ----------
 const kafka = new Kafka({
   clientId: "helfy-producer",
   brokers: (process.env.KAFKA_BROKERS || "kafka:9092").split(",")
@@ -15,34 +13,23 @@ const kafka = new Kafka({
 
 const producer = kafka.producer();
 
-async function startProducer() {
-  try {
-    await producer.connect();
-    console.log("Kafka producer connected");
-  } catch (err) {
-    console.error("Kafka producer error:", err);
-  }
+async function init() {
+  await producer.connect();
+  console.log("Producer connected to Kafka");
 }
-startProducer();
 
-// ---------- HTTP Routes ----------
-app.get("/", (req, res) => {
-  res.send(`
-    <h1>Helfy Producer</h1>
-    <p>Send messages to Kafka using POST /send</p>
-    <pre>
-POST /send
-{
-  "message": "hello from producer"
-}
-    </pre>
-  `);
+init().catch((err) => {
+  console.error("Failed to start producer:", err);
 });
 
-// Endpoint to send message to Kafka
+// health
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+// POST /send { message: "..." }
 app.post("/send", async (req, res) => {
   const { message } = req.body;
-
   if (!message) {
     return res.status(400).json({ error: "message is required" });
   }
@@ -53,16 +40,14 @@ app.post("/send", async (req, res) => {
       messages: [{ value: message }]
     });
 
-    console.log("Sent message to Kafka:", message);
-
     res.json({
       status: "sent",
       topic: process.env.KAFKA_TOPIC || "test-topic",
       message
     });
   } catch (err) {
-    console.error("Error sending message:", err);
-    res.status(500).json({ error: err.message });
+    console.error("Failed to send message:", err);
+    res.status(500).json({ error: "failed to send message" });
   }
 });
 

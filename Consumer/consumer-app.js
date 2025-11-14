@@ -1,16 +1,15 @@
-// consumer-app.js
 const express = require("express");
 const { Kafka } = require("kafkajs");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Basic in-memory metrics
+// in-memory metrics
 let messagesConsumed = 0;
 let lastMessage = null;
 let lastError = null;
 
-// ---------- Kafka Consumer ----------
+// ---------- Kafka consumer ----------
 const kafka = new Kafka({
   clientId: "helfy-consumer",
   brokers: (process.env.KAFKA_BROKERS || "kafka:9092").split(",")
@@ -32,7 +31,7 @@ async function startConsumer() {
       eachMessage: async ({ topic, partition, message }) => {
         const value = message.value.toString();
         messagesConsumed++;
-        lastMessage = { topic, value, ts: new Date() };
+        lastMessage = { topic, value, ts: new Date().toISOString() };
         console.log("Kafka message:", value);
       }
     });
@@ -41,25 +40,17 @@ async function startConsumer() {
     console.error("Kafka error:", err);
   }
 }
-startConsumer();
 
-// ---------- HTTP Routes ----------
-app.get("/", (req, res) => {
-  res.send(`
-    <h1>Helfy Consumer</h1>
-    <ul>
-      <li><a href="/health">/health</a></li>
-      <li><a href="/metrics">/metrics</a></li>
-      <li><a href="/last-message">/last-message</a></li>
-    </ul>
-  `);
+startConsumer().catch((err) => {
+  console.error("Failed to start consumer:", err);
 });
 
+// ---------- HTTP routes ----------
 app.get("/health", (req, res) => {
   res.json({
     status: lastError ? "degraded" : "ok",
     kafkaError: lastError,
-    timestamp: new Date()
+    timestamp: new Date().toISOString()
   });
 });
 

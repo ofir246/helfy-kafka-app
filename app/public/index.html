@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Helfy Login</title>
+  </head>
+  <body>
+    <h1>Login</h1>
+
+    <form id="login-form">
+      <div>
+        <label>Username:</label>
+        <input type="text" id="username" required />
+      </div>
+      <div>
+        <label>Password:</label>
+        <input type="password" id="password" required />
+      </div>
+      <button type="submit">Login</button>
+    </form>
+
+    <pre id="result"></pre>
+
+    <script>
+      const form = document.getElementById("login-form");
+      const resultEl = document.getElementById("result");
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const username = document.getElementById("username").value.trim();
+        const password = document.getElementById("password").value.trim();
+
+        if (!username || !password) {
+          alert("Please fill username and password");
+          return;
+        }
+
+        try {
+          const res = await fetch("/api/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password })
+          });
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            resultEl.textContent =
+              "Login failed: " + (data.error || "unknown error");
+            return;
+          }
+
+          // save token to localStorage
+          localStorage.setItem("authToken", data.token);
+          resultEl.textContent =
+            "Login success!\n" + JSON.stringify(data, null, 2);
+        } catch (err) {
+          resultEl.textContent = "Error: " + err.message;
+        }
+      });
+    </script>
+  </body>
+</html>
